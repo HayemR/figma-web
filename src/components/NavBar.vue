@@ -14,6 +14,8 @@ const items = [
 
 const activeHash = ref('#home')
 const linkRefs = ref([])
+const username = ref('')
+const apiBase = import.meta.env.VITE_API_BASE || 'http://localhost:8000'
 
 const setLinkRef = (el) => {
   if (!el) return
@@ -99,6 +101,48 @@ const updateActiveFromScroll = () => {
   activeHash.value = `#${current.id}`
 }
 
+const loadUser = () => {
+  try {
+    const raw = localStorage.getItem('auth.user')
+    const user = raw ? JSON.parse(raw) : null
+    username.value = user?.username || ''
+  } catch {
+    username.value = ''
+  }
+}
+
+const logout = () => {
+  localStorage.removeItem('auth.user')
+  localStorage.removeItem('auth.token')
+  window.dispatchEvent(new Event('auth:changed'))
+  router.push('/')
+}
+
+const deleteAccount = async () => {
+  if (!username.value) return
+  const confirmDelete = window.confirm('Delete this account permanently?')
+  if (!confirmDelete) return
+
+  const password = window.prompt('Enter your password to confirm')
+  if (!password) return
+
+  try {
+    const res = await fetch(`${apiBase}/api/delete-account`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: username.value, password }),
+    })
+
+    const data = await res.json()
+    if (!res.ok) throw new Error(data?.detail || 'Delete failed')
+
+    logout()
+    window.alert('Account deleted')
+  } catch (err) {
+    window.alert(err?.message || 'Delete failed')
+  }
+}
+
 let raf = 0
 const onScroll = () => {
   cancelAnimationFrame(raf)
@@ -107,8 +151,11 @@ const onScroll = () => {
 
 let ro = null
 onMounted(() => {
+  loadUser()
   updateActiveFromScroll()
   window.addEventListener('scroll', onScroll, { passive: true })
+  window.addEventListener('storage', loadUser)
+  window.addEventListener('auth:changed', loadUser)
 
   // Keep indicator aligned on resize/font load
   ro = new ResizeObserver(() => updateActiveFromScroll())
@@ -117,6 +164,8 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('scroll', onScroll)
+  window.removeEventListener('storage', loadUser)
+  window.removeEventListener('auth:changed', loadUser)
   cancelAnimationFrame(raf)
   scrollTween?.kill()
   if (ro) ro.disconnect()
@@ -155,16 +204,39 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="hidden items-center gap-3 md:flex">
-          <button
-            class="rounded-xl bg-white/10 px-4 py-2 text-sm text-white/80 ring-1 ring-white/15 hover:bg-white/15"
-          >
-            Login
-          </button>
-          <button
-            class="rounded-xl bg-gradient-to-r from-cyan-400 to-fuchsia-500 px-4 py-2 text-sm font-semibold text-black shadow-glow hover:brightness-110"
-          >
-            Sign Up
-          </button>
+          <template v-if="username">
+            <div
+              class="rounded-xl bg-white/10 px-4 py-2 text-sm text-white/90 ring-1 ring-white/15"
+            >
+              {{ username }}
+            </div>
+            <button
+              class="rounded-xl bg-white/10 px-3 py-2 text-xs text-white/80 ring-1 ring-white/15 hover:bg-white/15"
+              @click="logout"
+            >
+              Logout
+            </button>
+            <button
+              class="rounded-xl bg-red-500/20 px-3 py-2 text-xs text-red-100 ring-1 ring-red-400/30 hover:bg-red-500/30"
+              @click="deleteAccount"
+            >
+              Delete account
+            </button>
+          </template>
+          <template v-else>
+            <button
+              class="rounded-xl bg-white/10 px-4 py-2 text-sm text-white/80 ring-1 ring-white/15 hover:bg-white/15"
+              @click="router.push('/login')"
+            >
+              Login
+            </button>
+            <button
+              class="rounded-xl bg-gradient-to-r from-cyan-400 to-fuchsia-500 px-4 py-2 text-sm font-semibold text-black shadow-glow hover:brightness-110"
+              @click="router.push('/register')"
+            >
+              Sign Up
+            </button>
+          </template>
         </div>
 
         <div class="md:hidden">

@@ -25,6 +25,14 @@ See [Vite Configuration Reference](https://vite.dev/config/).
 pnpm install
 ```
 
+## Backend API (Python + SQLite)
+
+```sh
+cd backend
+pip install -r requirements.txt
+uvicorn app:app --reload --port 8000
+```
+
 ### Compile and Hot-Reload for Development
 
 ```sh
