@@ -33,6 +33,47 @@ pip install -r requirements.txt
 uvicorn app:app --reload --port 8000
 ```
 
+## Production (Bundled Frontend + Backend)
+
+Build the frontend once, then run only the Python server to serve both API and UI.
+
+```sh
+pnpm install
+pnpm build
+
+cd backend
+pip install -r requirements.txt
+uvicorn app:app --host 0.0.0.0 --port 8000
+```
+
+### Auto-start on a VPS (systemd)
+
+Create a service at `/etc/systemd/system/figma-web.service`:
+
+```ini
+[Unit]
+Description=Figma Web (FastAPI + bundled Vite build)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/path/to/figma-web
+ExecStart=/path/to/figma-web/.venv/bin/uvicorn app:app --host 0.0.0.0 --port 8000
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Then enable and start it:
+
+```sh
+sudo systemctl daemon-reload
+sudo systemctl enable figma-web
+sudo systemctl start figma-web
+```
+
 ### Compile and Hot-Reload for Development
 
 ```sh

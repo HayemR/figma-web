@@ -9,10 +9,13 @@ from typing import Optional
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "data", "app.db")
+STATIC_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "dist"))
 
 app = FastAPI(title="Figma Web Auth API", version="1.0.0")
 
@@ -24,6 +27,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+if os.path.isdir(os.path.join(STATIC_DIR, "assets")):
+    app.mount("/assets", StaticFiles(directory=os.path.join(STATIC_DIR, "assets")), name="assets")
 
 
 class RegisterRequest(BaseModel):
@@ -162,3 +168,30 @@ def delete_account(payload: DeleteAccountRequest) -> dict:
         conn.commit()
 
     return {"status": "deleted"}
+
+
+def _serve_frontend(path: str) -> FileResponse:
+    if not os.path.isdir(STATIC_DIR):
+        raise HTTPException(status_code=404, detail="Frontend build not found")
+
+    if path:
+        file_path = os.path.abspath(os.path.join(STATIC_DIR, path))
+        if not file_path.startswith(STATIC_DIR + os.sep):
+            raise HTTPException(status_code=404, detail="Not found")
+        if os.path.isfile(file_path):
+            return FileResponse(file_path)
+
+    return FileResponse(os.path.join(STATIC_DIR, "index.html"))
+
+
+@app.get("/")
+def serve_root() -> FileResponse:
+    return _serve_frontend("")
+
+
+@app.get("/{path:path}")
+def serve_spa(path: str) -> FileResponse:
+    if path.startswith("api"):
+        raise HTTPException(status_code=404, detail="Not found")
+
+    return _serve_frontend(path)
